@@ -55,13 +55,29 @@ export default function VerificationModal({
 
     const handleChange = async (text: string, index: number) => {
         if (isVerifying) return;
-        const digit = text.replace(/[^0-9]/g, "").slice(-1);
+        const digits = text.replace(/[^0-9]/g, "");
         const newCode = [...code];
-        newCode[index] = digit;
+
+        if (!digits) {
+            newCode[index] = "";
+            setCode(newCode);
+            return;
+        }
+
+        if (digits.length > 1) {
+            for (let i = 0; i < digits.length && index + i < newCode.length; i++) {
+                newCode[index + i] = digits[i];
+            }
+        } else {
+            newCode[index] = digits;
+        }
         setCode(newCode);
 
-        if (digit && index < 5) {
-            inputRefs.current[index + 1]?.focus();
+        if (index < 5) {
+            const nextIndex = Math.min(index + digits.length, 5);
+            if (!newCode.every((d) => d !== "")) {
+                inputRefs.current[nextIndex]?.focus();
+            }
         }
 
         if (newCode.every((d) => d !== "")) {
