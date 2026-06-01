@@ -1,9 +1,11 @@
 import { useAuth } from "@clerk/expo";
 import { Redirect } from "expo-router";
-import { Text, TouchableOpacity, View } from "react-native";
+
+import { useLanguageStore } from "@/store/languageStore";
 
 export default function Index() {
-    const { isSignedIn, isLoaded, signOut } = useAuth();
+    const { isSignedIn, isLoaded } = useAuth();
+    const { selectedLanguage } = useLanguageStore();
 
     if (!isLoaded) {
         return null;
@@ -13,19 +15,9 @@ export default function Index() {
         return <Redirect href="/onboarding" />;
     }
 
-    return (
-        <View className="flex-1 items-center justify-center gap-4">
-            <Text className="text-h1 font-poppins-bold text-text-primary">
-                KaoJaiThai
-            </Text>
-            <TouchableOpacity
-                onPress={() => signOut()}
-                className="bg-primary px-6 py-3 rounded-xl"
-            >
-                <Text className="text-white font-poppins-semibold">
-                    Sign Out
-                </Text>
-            </TouchableOpacity>
-        </View>
-    );
+    if (!selectedLanguage) {
+        return <Redirect href="/language-select" />;
+    }
+
+    return <Redirect href={"/(tabs)/" as never} />;
 }
