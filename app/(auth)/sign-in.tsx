@@ -3,11 +3,12 @@ import FacebookIcon from "@/assets/icons/facebook.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import VerificationModal from "@/components/VerificationModal";
 import { images } from "@/constants/images";
+import { useAnalytics } from "@/lib/posthog";
 import { useSignIn } from "@clerk/expo";
 import { AntDesign } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     ScrollView,
     Text,
@@ -24,23 +25,34 @@ export default function SignIn() {
     const [email, setEmail] = useState("");
     const [emailError, setEmailError] = useState("");
     const [modalVisible, setModalVisible] = useState(false);
+    const posthog = useAnalytics();
+
+    useEffect(() => {
+        posthog.screen("Sign In");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleSignIn = async () => {
         const trimmed = email.trim();
         if (!trimmed || !EMAIL_REGEX.test(trimmed)) {
             setEmailError("Please enter a valid email address.");
+            posthog.capture("sign_in_error", { error: "Invalid email format" });
             return;
         }
         setEmail(trimmed);
         setEmailError("");
+
+        posthog.capture("sign_in_email_submitted", { email: trimmed });
 
         const { error } = await signIn.emailCode.sendCode({
             emailAddress: trimmed,
         });
         if (error) {
             setEmailError(error.message ?? "Something went wrong.");
+            posthog.capture("sign_in_error", { error: error.message });
             return;
         }
+        posthog.capture("sign_in_verification_code_sent");
         setModalVisible(true);
     };
 
@@ -49,12 +61,22 @@ export default function SignIn() {
     ): Promise<{ success: boolean; error?: string }> => {
         const { error } = await signIn.emailCode.verifyCode({ code });
         if (error) {
+            posthog.capture("sign_in_verification_failed", {
+                error: error.message,
+            });
             return {
                 success: false,
                 error: error.message ?? "Invalid code. Please try again.",
             };
         }
         if (signIn.status === "complete") {
+            posthog.capture("sign_in_success", { email });
+            if (signIn.createdSessionId) {
+                posthog.identify(signIn.createdSessionId, {
+                    email,
+                    signInMethod: "email",
+                });
+            }
             await signIn.finalize({
                 navigate: ({ decorateUrl }) => {
                     router.replace(decorateUrl("/") as "/");
@@ -99,10 +121,10 @@ export default function SignIn() {
                 </View>
 
                 {/* Mascot */}
-                <View className="items-center mt-4 mb-2">
+                <View className="items-center mt-4 -mb-6.25 z-2">
                     <Image
                         source={images.mascotAuth}
-                        style={{ width: 160, height: 160 }}
+                        className="w-40 h-40"
                         contentFit="contain"
                     />
                 </View>
@@ -115,12 +137,7 @@ export default function SignIn() {
                             Email
                         </Text>
                         <TextInput
-                            style={{
-                                fontSize: 16,
-                                fontFamily: "Poppins-Regular",
-                                color: "#0D132B",
-                                padding: 0,
-                            }}
+                            className="text-base font-poppins-regular text-text-primary p-0"
                             value={email}
                             onChangeText={(text) => {
                                 setEmail(text);
@@ -167,14 +184,32 @@ export default function SignIn() {
                     <SocialButton
                         Icon={GoogleIcon}
                         label="Continue with Google"
+                        onPress={() =>
+                            posthog.capture("social_auth_clicked", {
+                                provider: "google",
+                                screen: "sign_in",
+                            })
+                        }
                     />
                     <SocialButton
                         Icon={FacebookIcon}
                         label="Continue with Facebook"
+                        onPress={() =>
+                            posthog.capture("social_auth_clicked", {
+                                provider: "facebook",
+                                screen: "sign_in",
+                            })
+                        }
                     />
                     <SocialButton
                         Icon={AppleIcon}
                         label="Continue with Apple"
+                        onPress={() =>
+                            posthog.capture("social_auth_clicked", {
+                                provider: "apple",
+                                screen: "sign_in",
+                            })
+                        }
                     />
                 </View>
 
@@ -208,14 +243,17 @@ export default function SignIn() {
 function SocialButton({
     Icon,
     label,
+    onPress,
 }: {
     Icon: React.FC<{ width?: number; height?: number }>;
     label: string;
+    onPress?: () => void;
 }) {
     return (
         <TouchableOpacity
             className="flex-row items-center border-[1.5px] border-border rounded-2xl py-3.5 px-5 gap-3.5 bg-white"
             activeOpacity={0.7}
+            onPress={onPress}
         >
             <Icon width={22} height={22} />
             <Text className="text-[15px] font-poppins-medium text-text-primary">

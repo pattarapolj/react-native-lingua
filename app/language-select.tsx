@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     Image,
     ScrollView,
@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { images } from "@/constants/images";
 import { languages } from "@/data/languages";
+import { useAnalytics } from "@/lib/posthog";
 import { useLanguageStore } from "@/store/languageStore";
 import type { Language, LanguageCode } from "@/types/learning";
 
@@ -21,6 +22,12 @@ export default function LanguageSelect() {
     const { setSelectedLanguage } = useLanguageStore();
     const [selectedCode, setSelectedCode] = useState<string | null>(null);
     const [search, setSearch] = useState("");
+    const posthog = useAnalytics();
+
+    useEffect(() => {
+        posthog.screen("Language Select");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const filtered = languages.filter((lang) =>
         lang.name.toLowerCase().includes(search.toLowerCase()),
@@ -28,8 +35,28 @@ export default function LanguageSelect() {
 
     const selectedLanguage = languages.find((l) => l.code === selectedCode);
 
+    const handleSearch = (text: string) => {
+        setSearch(text);
+        if (text.length > 0) {
+            posthog.capture("language_searched", { searchTerm: text });
+        }
+    };
+
+    const handleLanguageSelect = (code: string, name: string) => {
+        setSelectedCode(code);
+        posthog.capture("language_selected", {
+            languageCode: code,
+            languageName: name,
+        });
+    };
+
     function handleConfirm() {
         if (!selectedCode) return;
+        const lang = languages.find((l) => l.code === selectedCode);
+        posthog.capture("language_confirmed", {
+            languageCode: selectedCode,
+            languageName: lang?.name || null,
+        });
         setSelectedLanguage(selectedCode as LanguageCode);
         router.replace("/");
     }
@@ -58,9 +85,8 @@ export default function LanguageSelect() {
                         placeholder="Search languages"
                         placeholderTextColor="#6b7280"
                         value={search}
-                        onChangeText={setSearch}
-                        className="flex-1 font-regular text-body-md text-text-primary"
-                        style={{ padding: 0 }}
+                        onChangeText={handleSearch}
+                        className="flex-1 font-regular text-body-md text-text-primary p-0"
                     />
                 </View>
             </View>
@@ -84,7 +110,9 @@ export default function LanguageSelect() {
                             lang={lang}
                             isSelected={isSelected}
                             isLast={isLast}
-                            onPress={() => setSelectedCode(lang.code)}
+                            onPress={() =>
+                                handleLanguageSelect(lang.code, lang.name)
+                            }
                         />
                     );
                 })}
@@ -102,7 +130,7 @@ export default function LanguageSelect() {
             <View>
                 <View className="px-5 pb-6 pt-3">
                     <TouchableOpacity
-                        className={`bg-primary rounded-2xl py-[18px] items-center justify-center ${!selectedCode ? "opacity-50" : ""}`}
+                        className={`bg-primary rounded-2xl py-4.5 items-center justify-center ${!selectedCode ? "opacity-50" : ""}`}
                         disabled={!selectedCode}
                         onPress={handleConfirm}
                         activeOpacity={0.85}

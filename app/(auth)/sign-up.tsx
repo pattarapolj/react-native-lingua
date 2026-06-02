@@ -3,11 +3,12 @@ import FacebookIcon from "@/assets/icons/facebook.svg";
 import GoogleIcon from "@/assets/icons/google.svg";
 import VerificationModal from "@/components/VerificationModal";
 import { images } from "@/constants/images";
+import { useAnalytics } from "@/lib/posthog";
 import { useSignUp } from "@clerk/expo";
 import { AntDesign, Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
     ScrollView,
     Text,
@@ -28,12 +29,19 @@ export default function SignUp() {
     const [modalVisible, setModalVisible] = useState(false);
     const [emailError, setEmailError] = useState("");
     const [passwordError, setPasswordError] = useState("");
+    const posthog = useAnalytics();
+
+    useEffect(() => {
+        posthog.screen("Sign Up");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleSignUp = async () => {
         const trimmedEmail = email.trim();
         let valid = true;
         if (!trimmedEmail || !EMAIL_REGEX.test(trimmedEmail)) {
             setEmailError("Please enter a valid email address.");
+            posthog.capture("sign_up_error", { error: "Invalid email format" });
             valid = false;
         } else {
             setEmail(trimmedEmail);
@@ -43,11 +51,14 @@ export default function SignUp() {
             setPasswordError(
                 `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
             );
+            posthog.capture("sign_up_error", { error: "Password too short" });
             valid = false;
         } else {
             setPasswordError("");
         }
         if (!valid) return;
+
+        posthog.capture("sign_up_submitted", { email: trimmedEmail });
 
         const { error } = await signUp.password({
             emailAddress: trimmedEmail,
@@ -55,6 +66,7 @@ export default function SignUp() {
         });
         if (error) {
             setEmailError(error.message ?? "Something went wrong.");
+            posthog.capture("sign_up_error", { error: error.message });
             return;
         }
         const { error: sendError } = await signUp.verifications.sendEmailCode();
@@ -62,8 +74,10 @@ export default function SignUp() {
             setEmailError(
                 sendError.message ?? "Failed to send verification code.",
             );
+            posthog.capture("sign_up_error", { error: sendError.message });
             return;
         }
+        posthog.capture("sign_up_verification_code_sent");
         setModalVisible(true);
     };
 
@@ -72,12 +86,20 @@ export default function SignUp() {
     ): Promise<{ success: boolean; error?: string }> => {
         const { error } = await signUp.verifications.verifyEmailCode({ code });
         if (error) {
+            posthog.capture("sign_up_verification_failed", {
+                error: error.message,
+            });
             return {
                 success: false,
                 error: error.message ?? "Invalid code. Please try again.",
             };
         }
         if (signUp.status === "complete") {
+            posthog.capture("sign_up_success", { email });
+            posthog.identify(signUp.createdUserId || "", {
+                email,
+                signUpMethod: "email",
+            });
             await signUp.finalize({
                 navigate: ({ decorateUrl }) => {
                     router.replace(decorateUrl("/") as "/");
@@ -122,31 +144,23 @@ export default function SignUp() {
                 </View>
 
                 {/* Mascot */}
-                <View
-                    className="items-center mt-4"
-                    style={{ marginBottom: -25, zIndex: 2 }}
-                >
+                <View className="items-center mt-4 -mb-6.25 z-2">
                     <Image
                         source={images.mascotAuth}
-                        style={{ width: 160, height: 160 }}
+                        className="w-40 h-40"
                         contentFit="contain"
                     />
                 </View>
 
                 {/* Form */}
-                <View className="px-6 gap-3.5" style={{ zIndex: 1 }}>
+                <View className="px-6 gap-3.5 z-1">
                     {/* Email */}
                     <View className="bg-white rounded-2xl border-[1.5px] border-border px-4 py-3">
                         <Text className="text-xs font-poppins text-gray-400 mb-0.5">
                             Email
                         </Text>
                         <TextInput
-                            style={{
-                                fontSize: 16,
-                                fontFamily: "Poppins-Regular",
-                                color: "#0D132B",
-                                padding: 0,
-                            }}
+                            className="text-base font-poppins-regular text-text-primary p-0"
                             value={email}
                             onChangeText={(text) => {
                                 setEmail(text);
@@ -172,13 +186,7 @@ export default function SignUp() {
                         </Text>
                         <View className="flex-row items-center">
                             <TextInput
-                                style={{
-                                    flex: 1,
-                                    fontSize: 16,
-                                    fontFamily: "Poppins-Regular",
-                                    color: "#0D132B",
-                                    padding: 0,
-                                }}
+                                className="flex-1 text-base font-poppins-regular text-text-primary p-0"
                                 value={password}
                                 onChangeText={(text) => {
                                     setPassword(text);
@@ -235,14 +243,32 @@ export default function SignUp() {
                     <SocialButton
                         Icon={GoogleIcon}
                         label="Continue with Google"
+                        onPress={() =>
+                            posthog.capture("social_auth_clicked", {
+                                provider: "google",
+                                screen: "sign_up",
+                            })
+                        }
                     />
                     <SocialButton
                         Icon={FacebookIcon}
                         label="Continue with Facebook"
+                        onPress={() =>
+                            posthog.capture("social_auth_clicked", {
+                                provider: "facebook",
+                                screen: "sign_up",
+                            })
+                        }
                     />
                     <SocialButton
                         Icon={AppleIcon}
                         label="Continue with Apple"
+                        onPress={() =>
+                            posthog.capture("social_auth_clicked", {
+                                provider: "apple",
+                                screen: "sign_up",
+                            })
+                        }
                     />
                 </View>
 
@@ -276,14 +302,17 @@ export default function SignUp() {
 function SocialButton({
     Icon,
     label,
+    onPress,
 }: {
     Icon: React.FC<{ width?: number; height?: number }>;
     label: string;
+    onPress?: () => void;
 }) {
     return (
         <TouchableOpacity
             className="flex-row items-center border-[1.5px] border-border rounded-2xl py-3.5 px-5 gap-3.5 bg-white"
             activeOpacity={0.7}
+            onPress={onPress}
         >
             <Icon width={22} height={22} />
             <Text className="text-[15px] font-poppins-medium text-text-primary">

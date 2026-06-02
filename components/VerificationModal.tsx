@@ -65,7 +65,11 @@ export default function VerificationModal({
         }
 
         if (digits.length > 1) {
-            for (let i = 0; i < digits.length && index + i < newCode.length; i++) {
+            for (
+                let i = 0;
+                i < digits.length && index + i < newCode.length;
+                i++
+            ) {
                 newCode[index + i] = digits[i];
             }
         } else {
@@ -124,7 +128,7 @@ export default function VerificationModal({
             {/* Sheet rises above keyboard */}
             <KeyboardAvoidingView
                 behavior={Platform.OS === "ios" ? "position" : "height"}
-                style={{ position: "absolute", bottom: 0, left: 0, right: 0 }}
+                className="absolute bottom-0 left-0 right-0"
             >
                 <View className="bg-white rounded-tl-[28px] rounded-tr-[28px] px-6 pt-4 pb-11 items-center">
                     {/* Handle bar */}
@@ -204,10 +208,7 @@ export default function VerificationModal({
                         </TouchableOpacity>
                     </View>
 
-                    <TouchableOpacity
-                        onPress={onClose}
-                        style={{ paddingVertical: 8, paddingHorizontal: 32 }}
-                    >
+                    <TouchableOpacity onPress={onClose} className="py-2 px-8">
                         <Text className="text-body-md font-poppins-medium text-gray-400">
                             Cancel
                         </Text>

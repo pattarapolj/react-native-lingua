@@ -5,14 +5,22 @@ import { tokenCache } from "@clerk/expo/token-cache";
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { PostHogProvider } from "posthog-react-native";
 import { useEffect } from "react";
 
 SplashScreen.preventAutoHideAsync();
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
+const postHogApiKey = process.env.EXPO_PUBLIC_POSTHOG_API_KEY!;
+const postHogHost =
+    process.env.EXPO_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
 
 if (!publishableKey) {
     throw new Error("Add your Clerk Publishable Key to the .env file");
+}
+
+if (!postHogApiKey) {
+    throw new Error("Add your PostHog API Key to the .env file");
 }
 
 export default function RootLayout() {
@@ -34,8 +42,23 @@ export default function RootLayout() {
     }
 
     return (
-        <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-            <Stack screenOptions={{ headerShown: false }} />
-        </ClerkProvider>
+        <PostHogProvider
+            apiKey={postHogApiKey}
+            options={{
+                host: postHogHost,
+            }}
+        >
+            <ClerkProvider
+                publishableKey={publishableKey}
+                tokenCache={tokenCache}
+            >
+                <Stack
+                    screenOptions={{
+                        headerShown: false,
+                        gestureEnabled: false,
+                    }}
+                />
+            </ClerkProvider>
+        </PostHogProvider>
     );
 }

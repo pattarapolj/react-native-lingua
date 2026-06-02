@@ -1,6 +1,8 @@
 import { images } from "@/constants/images";
+import { useAnalytics } from "@/lib/posthog";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import { useEffect } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -13,13 +15,26 @@ const bubbleShadow = {
 };
 
 export default function Onboarding() {
+    const posthog = useAnalytics();
+
+    useEffect(() => {
+        // Track screen view when onboarding loads
+        posthog.screen("Onboarding");
+    }, []);
+
+    const handleGetStarted = () => {
+        // Track button click
+        posthog.capture("onboarding_get_started_clicked");
+        router.push("/sign-up");
+    };
+
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: "#ffffff" }}>
             {/* Logo */}
             <View className="items-center justify-center mt-4">
                 <Image
                     source={images.mascotHeaderLogo}
-                    style={{ width: 200, height: 60 }}
+                    className="w-50 h-15"
                     contentFit="contain"
                 />
             </View>
@@ -62,7 +77,7 @@ export default function Onboarding() {
                 {/* Mascot */}
                 <Image
                     source={images.mascotWelcome}
-                    style={{ width: 280, height: 280 }}
+                    className="w-70 h-70"
                     contentFit="contain"
                 />
 
@@ -82,7 +97,7 @@ export default function Onboarding() {
                 <TouchableOpacity
                     className="bg-primary rounded-2xl py-5 flex-row items-center justify-center"
                     activeOpacity={0.85}
-                    onPress={() => router.push("/sign-up")}
+                    onPress={handleGetStarted}
                 >
                     <Text className="text-white text-[18px] font-poppins-bold mr-2">
                         Get Started

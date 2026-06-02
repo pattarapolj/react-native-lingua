@@ -1,13 +1,28 @@
+import { useAnalytics } from "@/lib/posthog";
 import { useAuth, useUser } from "@clerk/expo";
 import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Text, TouchableOpacity, View } from "react-native";
 
 export default function ProfileScreen() {
     const { signOut } = useAuth();
     const { user } = useUser();
     const router = useRouter();
+    const posthog = useAnalytics();
+
+    useEffect(() => {
+        posthog.screen("Profile", {
+            userId: user?.id || null,
+            email: user?.primaryEmailAddress?.emailAddress || null,
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleSignOut = async () => {
+        posthog.capture("sign_out", {
+            userId: user?.id || null,
+        });
+        posthog.reset();
         await signOut();
         router.replace("/onboarding");
     };

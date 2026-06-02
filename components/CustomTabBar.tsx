@@ -1,3 +1,5 @@
+import { colors } from "@/constants/theme";
+import { useAnalytics } from "@/lib/posthog";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useEffect } from "react";
@@ -8,8 +10,6 @@ import Animated, {
     withSpring,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-import { colors } from "@/constants/theme";
 
 const CIRCLE_SIZE = 52;
 const TAB_BAR_HEIGHT = 64;
@@ -63,6 +63,7 @@ const TAB_CONFIG: TabConfig[] = [
 export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
     const insets = useSafeAreaInsets();
     const tabCount = state.routes.length;
+    const posthog = useAnalytics();
 
     const tabBarWidth = useSharedValue(0);
     const circleX = useSharedValue(0);
@@ -107,6 +108,11 @@ export default function CustomTabBar({ state, navigation }: BottomTabBarProps) {
                             canPreventDefault: true,
                         });
                         if (!isActive && !event.defaultPrevented) {
+                            posthog.capture("tab_switched", {
+                                fromTab: state.routes[state.index].name,
+                                toTab: tab.name,
+                                tabLabel: tab.label,
+                            });
                             navigation.navigate(route.name);
                         }
                     };
